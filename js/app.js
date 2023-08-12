@@ -1,3 +1,6 @@
+// Variable para almacenar la DB una vez creada
+let DB
+
 // Campos del formulario
 const mascotaInput = document.querySelector("#mascota")
 const propietarioInput = document.querySelector("#propietario")
@@ -55,74 +58,76 @@ class UI {
         }, 4000)
     }
     // imprimir citas en el DOM
-    imprimirCitas({ citas }) {
+    imprimirCitas() {
 
         this.limpiarHTML()
 
-        citas.forEach(cita => {
-            const { id, mascota, propietario, telefono, fecha, hora, sintomas } = cita
+        // Leer contenido de la BBDD
+        const objectStore = DB.transaction('citas').objectStore('citas')
 
-            const divCita = document.createElement('div')
-            divCita.classList.add('cita', 'p-3')
-            divCita.dataset.id = id
+        objectStore.openCursor().onsuccess = (e) => { // este metodo cursor se encarga de ir iterando sobre las citas sin necesidad de hacer un foreach
+            const cursor = e.target.result
+            if (cursor) {
+                const { id, mascota, propietario, telefono, fecha, hora, sintomas } = cursor.value
 
-            // Scripting de los elementos de la cita
-            const mascotaParrafo = document.createElement('h2')
-            mascotaParrafo.classList.add('card-title', 'font-weight-bolder')
-            mascotaParrafo.textContent = mascota
+                const divCita = document.createElement('div')
+                divCita.classList.add('cita', 'p-3')
+                divCita.dataset.id = id
 
-            const propietarioParrafo = document.createElement('p')
-            propietarioParrafo.innerHTML = `
+                // Scripting de los elementos de la cita
+                const mascotaParrafo = document.createElement('h2')
+                mascotaParrafo.classList.add('card-title', 'font-weight-bolder')
+                mascotaParrafo.textContent = mascota
+
+                const propietarioParrafo = document.createElement('p')
+                propietarioParrafo.innerHTML = `
             <span class="font-weight-bolder">Propietario: </span> ${propietario}
             `
 
-            const telefonoParrafo = document.createElement('p')
-            telefonoParrafo.innerHTML = `
-            <span class="font-weight-bolder">Teléfono: </span> ${telefono}
-            `
-            const fechaParrafo = document.createElement('p')
-            fechaParrafo.innerHTML = `
-            <span class="font-weight-bolder">Fecha: </span> ${fecha}
-            `
+                const telefonoParrafo = document.createElement('p')
+                telefonoParrafo.innerHTML = `<span class="font-weight-bolder">Teléfono: </span> ${telefono}`
+                const fechaParrafo = document.createElement('p')
+                fechaParrafo.innerHTML = `<span class="font-weight-bolder">Fecha: </span> ${fecha}`
 
-            const horaParrafo = document.createElement('p')
-            horaParrafo.innerHTML = `
-            <span class="font-weight-bolder">Hora: </span> ${hora}
-            `
+                const horaParrafo = document.createElement('p')
+                horaParrafo.innerHTML = `<span class="font-weight-bolder">Hora: </span> ${hora}`
 
-            const sintomasParrafo = document.createElement('p')
-            sintomasParrafo.innerHTML = `
-            <span class="font-weight-bolder">Síntomas: </span> ${sintomas}
-            `
+                const sintomasParrafo = document.createElement('p')
+                sintomasParrafo.innerHTML = `<span class="font-weight-bolder">Síntomas: </span> ${sintomas}`
 
-            // Botón para eliminar cita
-            const btnEliminar = document.createElement('button')
-            btnEliminar.classList.add('btn', 'btn-danger', 'mr-2')
-            btnEliminar.innerHTML = 'Eliminar';
+                // Botón para eliminar cita
+                const btnEliminar = document.createElement('button')
+                btnEliminar.classList.add('btn', 'btn-danger', 'mr-2')
+                btnEliminar.innerHTML = 'Eliminar';
 
-            btnEliminar.onclick = () => eliminarCita(id)
+                btnEliminar.onclick = () => eliminarCita(id)
 
-            // Botón actualizar cita
-            const btnEditar = document.createElement('button')
-            btnEditar.classList.add('btn', 'btn-info', 'mr-2')
-            btnEditar.innerHTML = "Editar"
+                // Botón actualizar cita
+                const btnEditar = document.createElement('button')
+                btnEditar.classList.add('btn', 'btn-info', 'mr-2')
+                btnEditar.innerHTML = "Editar"
+                const cita = cursor.value
 
-            btnEditar.onclick = () => cargarEdicion(cita)
+                btnEditar.onclick = () => cargarEdicion(cita)
 
-            // Agregar los parrafos al div
-            divCita.appendChild(mascotaParrafo)
-            divCita.appendChild(propietarioParrafo)
-            divCita.appendChild(telefonoParrafo)
-            divCita.appendChild(fechaParrafo)
-            divCita.appendChild(horaParrafo)
-            divCita.appendChild(sintomasParrafo)
-            divCita.appendChild(btnEliminar)
-            divCita.appendChild(btnEditar)
+                // Agregar los parrafos al div
+                divCita.appendChild(mascotaParrafo)
+                divCita.appendChild(propietarioParrafo)
+                divCita.appendChild(telefonoParrafo)
+                divCita.appendChild(fechaParrafo)
+                divCita.appendChild(horaParrafo)
+                divCita.appendChild(sintomasParrafo)
+                divCita.appendChild(btnEliminar)
+                divCita.appendChild(btnEditar)
 
-            // Agregar cita al HTML
-            contenedorCitas.appendChild(divCita)
+                // Agregar cita al HTML
+                contenedorCitas.appendChild(divCita)
 
-        })
+                // Pasar al siguiente elemento con un iterador
+                cursor.continue()
+            }
+        }
+
     }
 
     limpiarHTML() {
@@ -136,7 +141,11 @@ class UI {
 const ui = new UI()
 const adminCitas = new Citas()
 
-eventListeners()
+// Llamamos a los eventos cuando se carga la pagina:
+window.onload = () => {
+    eventListeners()
+    crearDB()
+}
 
 // registrar Eventos
 function eventListeners() {
@@ -183,28 +192,51 @@ function nuevaCita(e) {
 
     if (editando) {
 
-        // Agregar mensaje
-        ui.imprimirAlerta("Cita editada correctamente")
-
         // Pasar el objeto de la cita a edición 
         adminCitas.editarCita({ ...citaObj })
 
-        // Retornar al valor original del boton de submit
-        formulario.querySelector('button[type="submit"]').textContent = "Crear cita"
+        // Edita en IndexDB
+        const transaction = DB.transaction(['citas'], 'readwrite')
+        const objectStore = transaction.objectStore('citas')
 
-        // retornar la variable editanto a false
-        editando = false
+        objectStore.put(citaObj)
+
+        transaction.oncomplete = () => {
+
+            // Agregar mensaje
+            ui.imprimirAlerta("Cita editada correctamente")
+
+            // Retornar al valor original del boton de submit
+            formulario.querySelector('button[type="submit"]').textContent = "Crear cita"
+
+            // retornar la variable editanto a false
+            editando = false
+        }
+
     } else {
 
         // Agregar id a la cita
         citaObj.id = Date.now()
+
         // Agregar cita
         adminCitas.agregarCita({ ...citaObj }) // hay que sacar una copia, ya que si le pasamos el valor global no nos duplica el objeto n vecesen el array this.citas
-        // Agregar mensaje
-        ui.imprimirAlerta("Cita agregada correctamente")
+
+        // Insertar cita (nuevo registro) en DB
+        const transaction = DB.transaction(['citas'], 'readwrite')
+
+        // habilitar el object store
+        const objectStore = transaction.objectStore('citas')
+
+        // Insertar el objeto en DB
+        objectStore.add(citaObj)
+
+        // Se ejecuta si ha ido todo bien
+        transaction.oncomplete = () => {
+            // Agregar mensaje
+            ui.imprimirAlerta("Cita agregada correctamente")
+        }
+
     }
-
-
 
     // Vaciar formulario
     formulario.reset()
@@ -213,7 +245,8 @@ function nuevaCita(e) {
     reiniciarObjeto()
 
     // Mostrar citas en HTML
-    ui.imprimirCitas(adminCitas)
+    ui.imprimirCitas()
+
 }
 
 // Reiniciar el objeto, es decir citaObj a pesar de que se queda vacío el formulario, el objeto se queda en memoria y si agregamos nueva cita aunque sea con el formulario vacío, nos agrega la misma cita
@@ -229,14 +262,23 @@ function reiniciarObjeto() {
 }
 
 function eliminarCita(id) {
+
     // Eliminar cita
-    adminCitas.eliminarCita(id)
+    const transaction = DB.transaction(['citas'], 'readwrite')
+    const objectStore = transaction.objectStore('citas')
+    objectStore.delete(id)
 
-    // mostrar mensaje
-    ui.imprimirAlerta('La cita se ha eliminado correctamente')
+    transaction.oncomplete = () => {
+        // mostrar mensaje
+        ui.imprimirAlerta('La cita se ha eliminado correctamente')
+        // Refrescar las citas
+        ui.imprimirCitas()
+    }
 
-    // Refrescar las citas
-    ui.imprimirCitas(adminCitas)
+    transaction.onerror = () => {
+        console.log("hubo un error durante el proceso de eliminación")
+    }
+
 }
 
 function cargarEdicion(cita) {
@@ -265,4 +307,47 @@ function cargarEdicion(cita) {
 
     editando = true
 
+}
+
+function crearDB() {
+
+    // Crear db en v1.0
+    const crearDB = window.indexedDB.open('citas', 1)
+
+    // Si hay un error en la creación
+    crearDB.onerror = () => {
+        console.log("Hubo un error")
+    }
+
+    // Si todo ha ido bien en la creación
+    crearDB.onsuccess = () => {
+        console.log("Base de datos creada")
+        DB = crearDB.result // almacenamos en DB la base de datos creada
+
+        ui.imprimirCitas() // llamamos a imprimir citas cuando se cargue la pagina y la ddbb está lista
+    }
+
+    // Definir schema de BBDD
+    crearDB.onupgradeneeded = (e) => {
+
+        //Almacenamos en db una instancia de la db
+        const db = e.target.result
+
+        // Creamos el ObjectStore, le pasamos la bbdd donde la creamos y un objeto con la configuracion del keyPath o índice
+        const objectStore = db.createObjectStore('citas', {
+            keyPath: "id",
+            autoIncrement: true
+        })
+
+        // Definir las columnas de la db
+        objectStore.createIndex('mascota', 'mascota', { unique: false })
+        objectStore.createIndex('propietario', 'propietario', { unique: false })
+        objectStore.createIndex('telefono', 'telefono', { unique: false })
+        objectStore.createIndex('fecha', 'fecha', { unique: false })
+        objectStore.createIndex('hora', 'hora', { unique: false })
+        objectStore.createIndex('sintomas', 'sintomas', { unique: false })
+        objectStore.createIndex('id', 'id', { unique: true })
+
+        console.log("db creada y lista")
+    }
 }
